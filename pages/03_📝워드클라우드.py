@@ -5,12 +5,7 @@ from urllib.parse import urlparse, parse_qs
 from wordcloud import WordCloud
 import matplotlib.pyplot as plt
 from io import BytesIO
-
-# -----------------------------
-# 🔎 디버그용: 지금 이 앱에서 읽히는 secrets 키들 확인
-# -----------------------------
-st.sidebar.write("🔐 Secrets keys:", list(st.secrets.keys()))
-
+import os
 
 # -----------------------------
 # 1. 유튜브 영상 ID 추출 함수
@@ -24,7 +19,6 @@ def extract_video_id(url):
             return parse_qs(parsed.query).get("v", [None])[0]
     except:
         return None
-
 
 # -----------------------------
 # 2. 댓글 불러오기
@@ -61,16 +55,13 @@ def get_all_comments(api_key, video_id, max_pages=5):
 
     return comments
 
-
 # -----------------------------
 # Streamlit UI
 # -----------------------------
 st.title("🌈 YouTube 댓글 워드클라우드 생성기")
 st.write("많이 등장하는 단어일수록 크게 보이는 시각화를 제공합니다!")
 
-# ✅ 다른 페이지와 '완전히 똑같이' API 키 불러오기
 api_key = st.secrets.get("YT_API_KEY")
-st.write("🔎 DEBUG - api_key is None? →", api_key is None)
 
 youtube_url = st.text_input("🎥 YouTube 영상 URL 입력")
 max_pages = st.slider("가져올 댓글 페이지 수 (1페이지=100개)", 1, 10, 5)
@@ -106,15 +97,23 @@ if st.button("워드클라우드 만들기"):
 
     all_text = " ".join(comments)
 
-    # Streamlit Cloud에서 한글 지원되는 폰트 (Noto)
-    font_path = "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc"
+    # 🔤 폰트 경로 설정 (있으면 사용, 없으면 기본 폰트 사용)
+    candidate_font = "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc"
+    if os.path.exists(candidate_font):
+        font_path = candidate_font
+    else:
+        font_path = None  # 기본 폰트 사용 (한글은 약간 깨질 수 있음)
 
-    wc = WordCloud(
-        font_path=font_path,
+    wc_kwargs = dict(
         width=800,
         height=400,
         background_color="white",
-    ).generate(all_text)
+    )
+
+    if font_path:
+        wc = WordCloud(font_path=font_path, **wc_kwargs).generate(all_text)
+    else:
+        wc = WordCloud(**wc_kwargs).generate(all_text)
 
     fig, ax = plt.subplots(figsize=(10, 6))
     ax.imshow(wc, interpolation="bilinear")
