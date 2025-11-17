@@ -6,9 +6,10 @@ from wordcloud import WordCloud
 import matplotlib.pyplot as plt
 from io import BytesIO
 import os
+import re
 
 # -----------------------------
-# 1. 유튜브 영상 ID 추출 함수
+# 1. 유튜브 영상 ID 추출
 # -----------------------------
 def extract_video_id(url):
     try:
@@ -55,6 +56,7 @@ def get_all_comments(api_key, video_id, max_pages=5):
 
     return comments
 
+
 # -----------------------------
 # Streamlit UI
 # -----------------------------
@@ -64,14 +66,23 @@ st.write("많이 등장하는 단어일수록 크게 보이는 시각화를 제�
 api_key = st.secrets.get("YT_API_KEY")
 
 youtube_url = st.text_input("🎥 YouTube 영상 URL 입력")
-max_pages = st.slider("가져올 댓글 페이지 수 (1페이지=100개)", 1, 10, 5)
+max_pages = st.slider("불러올 댓글 페이지 수 (1페이지=100개)", 1, 10, 5)
+
+# 🔤 불용어(금지단어) 입력 UI
+user_stopwords = st.text_input("🛑 제외하고 싶은 단어(쉼표로 구분)", "ㅋㅋㅋㅋ, ㅋㅋ, 진짜, 그냥, 영상, 사람, 그거")
+
+# 기본 불용어 목록
+default_stopwords = {
+    "영상", "진짜", "그냥", "ㅋㅋㅋㅋ", "ㅋㅋㅋ", "ㅋㅋ", 
+    "그거", "이거", "님", "아니", "근데", "그리고"
+}
 
 # -----------------------------
 # 버튼 클릭 시 실행
 # -----------------------------
 if st.button("워드클라우드 만들기"):
     if not api_key:
-        st.error("❌ API 키가 없습니다. 이 앱의 Secrets에 YT_API_KEY를 다시 확인해 주세요.")
+        st.error("❌ API 키가 없습니다.")
         st.stop()
 
     video_id = extract_video_id(youtube_url)
@@ -80,44 +91,54 @@ if st.button("워드클라우드 만들기"):
         st.stop()
 
     try:
-        with st.spinner("댓글을 불러오는 중입니다..."):
-            comments = get_all_comments(api_key, video_id, max_pages)
-
-    except RuntimeError as e:
-        st.error(str(e))
-        st.stop()
-
+        comments = get_all_comments(api_key, video_id, max_pages)
     except Exception as e:
-        st.error(f"알 수 없는 오류 발생: {e}")
+        st.error(f"에러 발생: {e}")
         st.stop()
 
     if not comments:
-        st.warning("댓글이 하나도 없어요!")
+        st.warning("댓글이 없습니다.")
         st.stop()
 
-    all_text = " ".join(comments)
+    # -----------------------------
+    # 3. 텍스트 전처리 + 불용어 제거
+    # -----------------------------
+    text = " ".join(comments)
 
-    # 🔤 MaruBuri 폰트 경로 (프로젝트 내 fonts 폴더 기준)
+    # 정규식으로 특수문자/이모지 제거
+    text = re.sub(r"[^가-힣A-Za-z0-9\s]", " ", text)
+
+    # 사용자 입력 불용어 정리
+    custom_words = set(w.strip() for w in user_stopwords.split(",") if w.strip())
+
+    # 전체 불용어 조합
+    stopwords = default_stopwords.union(custom_words)
+
+    # 불용어 제거 수행
+    for sw in stopwords:
+        text = text.replace(sw, " ")
+
+    # -----------------------------
+    # 4. 폰트 설정 → MaruBuri (안되면 기본폰트로)
+    # -----------------------------
     font_path = "fonts/MaruBuri-Regular.ttf"
+    wc_kwargs = dict(width=800, height=400, background_color="white")
 
-    # 폰트 파일 존재 여부 체크 (디버그용)
-    if not os.path.exists(font_path):
-        st.error("폰트 파일을 찾을 수 없습니다. 'fonts/MaruBuri-Regular.ttf'가 GitHub에 올라가 있는지 확인해 주세요.")
-        st.stop()
+    try:
+        wc = WordCloud(font_path=font_path, **wc_kwargs).generate(text)
+    except:
+        st.warning("⚠️ MaruBuri 폰트를 사용할 수 없어 기본폰트로 생성합니다.")
+        wc = WordCloud(**wc_kwargs).generate(text)
 
-    # 워드클라우드 생성
-    wc = WordCloud(
-        font_path=font_path,
-        width=800,
-        height=400,
-        background_color="white",
-    ).generate(all_text)
-
+    # -----------------------------
+    # 5. 워드클라우드 표시
+    # -----------------------------
     fig, ax = plt.subplots(figsize=(10, 6))
     ax.imshow(wc, interpolation="bilinear")
     ax.axis("off")
     st.pyplot(fig)
 
+    # 이미지 다운로드
     img_bytes = BytesIO()
     fig.savefig(img_bytes, format="png")
     img_bytes.seek(0)
@@ -128,5 +149,4 @@ if st.button("워드클라우드 만들기"):
         file_name="wordcloud.png",
         mime="image/png",
     )
-
-    st.success("워드클라우드 생성 완료!")
+    st.success("완료! 워드클라우드 생성됨 😊")
