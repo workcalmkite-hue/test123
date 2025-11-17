@@ -1,6 +1,7 @@
 import streamlit as st
 
 
+# 약수를 구하는 함수
 def get_divisors(n: int):
 return [i for i in range(1, n + 1) if n % i == 0]
 
