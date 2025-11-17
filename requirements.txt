@@ -2,3 +2,5 @@ streamlit
 google-api-python-client
 python-dotenv
 requests
+wordcloud
+matplotlib
