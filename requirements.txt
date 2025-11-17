@@ -4,3 +4,5 @@ python-dotenv
 requests
 wordcloud
 matplotlib
+youtube-transcript-api
+openai
