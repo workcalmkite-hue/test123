@@ -6,7 +6,6 @@ from wordcloud import WordCloud
 import matplotlib.pyplot as plt
 from io import BytesIO
 
-
 # -----------------------------
 # 1. 유튜브 영상 ID 추출 함수
 # -----------------------------
@@ -19,7 +18,6 @@ def extract_video_id(url):
             return parse_qs(parsed.query).get("v", [None])[0]
     except:
         return None
-
 
 # -----------------------------
 # 2. 댓글 불러오기
@@ -40,6 +38,7 @@ def get_all_comments(api_key, video_id, max_pages=5):
                 pageToken=page_token
             )
             response = request.execute()
+
         except HttpError as e:
             if e.resp.status == 403:
                 raise RuntimeError("이 영상은 댓글이 비활성화되어 있습니다.")
@@ -55,19 +54,17 @@ def get_all_comments(api_key, video_id, max_pages=5):
 
     return comments
 
-
 # -----------------------------
 # Streamlit UI
 # -----------------------------
 st.title("🌈 YouTube 댓글 워드클라우드 생성기")
 st.write("많이 등장하는 단어일수록 크게 보이는 시각화를 제공합니다!")
 
-# ➤ API 키: 다른 페이지와 동일하게
+# API KEY
 api_key = st.secrets.get("YT_API_KEY")
 
 youtube_url = st.text_input("🎥 YouTube 영상 URL 입력")
 max_pages = st.slider("가져올 댓글 페이지 수 (1페이지=100개)", 1, 10, 5)
-
 
 # -----------------------------
 # 버튼 클릭 시 실행
@@ -85,9 +82,11 @@ if st.button("워드클라우드 만들기"):
     try:
         with st.spinner("댓글을 불러오는 중입니다..."):
             comments = get_all_comments(api_key, video_id, max_pages)
+
     except RuntimeError as e:
         st.error(str(e))
         st.stop()
+
     except Exception as e:
         st.error(f"알 수 없는 오류 발생: {e}")
         st.stop()
@@ -96,12 +95,14 @@ if st.button("워드클라우드 만들기"):
         st.warning("댓글이 하나도 없어요!")
         st.stop()
 
-    # 텍스트 합치기
+    # 모든 텍스트 합치기
     all_text = " ".join(comments)
 
-    # 워드클라우드 생성
+    # --- 🔥 핵심 수정: Streamlit Cloud에서 항상 존재하는 폰트 사용 ---
+    font_path = "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc"
+
     wc = WordCloud(
-        font_path="/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        font_path=font_path,
         width=800,
         height=400,
         background_color="white"
@@ -113,7 +114,7 @@ if st.button("워드클라우드 만들기"):
     ax.axis("off")
     st.pyplot(fig)
 
-    # 다운로드 저장
+    # 다운로드
     img_bytes = BytesIO()
     fig.savefig(img_bytes, format="png")
     img_bytes.seek(0)
