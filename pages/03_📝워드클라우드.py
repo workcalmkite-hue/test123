@@ -97,23 +97,21 @@ if st.button("워드클라우드 만들기"):
 
     all_text = " ".join(comments)
 
-    # 🔤 폰트 경로 설정 (있으면 사용, 없으면 기본 폰트 사용)
-    candidate_font = "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc"
-    if os.path.exists(candidate_font):
-        font_path = candidate_font
-    else:
-        font_path = None  # 기본 폰트 사용 (한글은 약간 깨질 수 있음)
+    # 🔤 MaruBuri 폰트 경로 (프로젝트 내 fonts 폴더 기준)
+    font_path = "fonts/MaruBuri-Regular.ttf"
 
-    wc_kwargs = dict(
+    # 폰트 파일 존재 여부 체크 (디버그용)
+    if not os.path.exists(font_path):
+        st.error("폰트 파일을 찾을 수 없습니다. 'fonts/MaruBuri-Regular.ttf'가 GitHub에 올라가 있는지 확인해 주세요.")
+        st.stop()
+
+    # 워드클라우드 생성
+    wc = WordCloud(
+        font_path=font_path,
         width=800,
         height=400,
         background_color="white",
-    )
-
-    if font_path:
-        wc = WordCloud(font_path=font_path, **wc_kwargs).generate(all_text)
-    else:
-        wc = WordCloud(**wc_kwargs).generate(all_text)
+    ).generate(all_text)
 
     fig, ax = plt.subplots(figsize=(10, 6))
     ax.imshow(wc, interpolation="bilinear")
