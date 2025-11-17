@@ -1,6 +1,6 @@
 import streamlit as st
-from googleapiclient.discovery import build
 from urllib.parse import urlparse, parse_qs
+import requests
 
 # -----------------------------
 # YouTube 영상 ID 추출 함수
@@ -16,62 +16,42 @@ def extract_video_id(url):
         return None
 
 # -----------------------------
-# YouTube 댓글 불러오기
+# YouTube 썸네일 URL 가져오기
 # -----------------------------
-def get_top_comments(api_key, video_id, max_results=50):
-    youtube = build('youtube', 'v3', developerKey=api_key)
-
-    request = youtube.commentThreads().list(
-        part="snippet",
-        videoId=video_id,
-        maxResults=max_results,
-        order="relevance"  # 관련도 높은 순
-    )
-
-    response = request.execute()
-
-    comments = []
-    for item in response.get("items", []):
-        snippet = item["snippet"]["topLevelComment"]["snippet"]
-        comments.append({
-            "author": snippet.get("authorDisplayName", "Unknown"),
-            "text": snippet.get("textDisplay", ""),
-            "likes": snippet.get("likeCount", 0)
-        })
-
-    comments.sort(key=lambda x: x["likes"], reverse=True)
-    return comments[:3]
+def get_video_thumbnail(video_id):
+    # 최대 해상도 썸네일 URL
+    return f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg"
 
 # -----------------------------
 # Streamlit UI
 # -----------------------------
-st.title("📌 YouTube 영상 베스트 댓글 추출기")
-st.write("유튜브 링크를 입력하면 공감(좋아요) 상위 3개 댓글을 보여줍니다.")
-
-# Streamlit Secrets에서 API 키 가져오기
-api_key = st.secrets.get("YT_API_KEY")
+st.title("📌 YouTube 썸네일 추출기 & 다운로드")
+st.write("유튜브 링크를 입력하면 영상 썸네일을 보여주고, 다운로드도 가능합니다.")
 
 youtube_url = st.text_input("YouTube 영상 URL 입력")
 
-if st.button("베스트 댓글 가져오기"):
-    if not api_key:
-        st.error("API 키가 설정되어 있지 않습니다. Streamlit Secrets에 YT_API_KEY를 추가하세요.")
+if st.button("썸네일 가져오기"):
+    video_id = extract_video_id(youtube_url)
+    if not video_id:
+        st.error("유효한 YouTube URL이 아닙니다.")
     else:
-        video_id = extract_video_id(youtube_url)
-        if not video_id:
-            st.error("유효한 YouTube URL이 아닙니다.")
-        else:
-            try:
-                top_comments = get_top_comments(api_key, video_id)
-                if not top_comments:
-                    st.warning("댓글을 찾을 수 없습니다.")
-                else:
-                    st.subheader("👍 베스트 댓글 Top 3")
-                    for idx, c in enumerate(top_comments, 1):
-                        st.markdown(f"### 댓글 {idx}")
-                        st.write(f"**작성자:** {c['author']}")
-                        st.write(f"**좋아요:** {c['likes']}")
-                        st.write(c['text'])
-                        st.markdown("---")
-            except Exception as e:
-                st.error(f"에러 발생: {e}")
+        thumbnail_url = get_video_thumbnail(video_id)
+        
+        # 썸네일 표시
+        st.image(thumbnail_url, caption="썸네일", use_column_width=True)
+        st.success("썸네일을 가져왔습니다!")
+
+        # 썸네일 이미지 다운로드
+        try:
+            response = requests.get(thumbnail_url)
+            if response.status_code == 200:
+                st.download_button(
+                    label="썸네일 다운로드",
+                    data=response.content,
+                    file_name=f"{video_id}_thumbnail.jpg",
+                    mime="image/jpeg"
+                )
+            else:
+                st.warning("썸네일 다운로드를 불러올 수 없습니다.")
+        except Exception as e:
+            st.error(f"다운로드 중 에러 발생: {e}")
